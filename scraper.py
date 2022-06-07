@@ -19,27 +19,38 @@ class SeleniumDriver:
 
 
 class Scraper:
-    def __init__(self, db_name="BandcampDB"):
+    def __init__(self, database):
         self.driver = SeleniumDriver()
-        self.database = BandcampDB(db_name=db_name, create_new_db=False)
-
+        self.database = database
+        # Pages to visit
         self.artist_stack = []
         self.album_stack = []
         self.user_stack = []
 
-        self.artists
+        # Load urls of visited pages from database so we can skip them if we see them again
+        # Also use sets instead of lists as order doesnt matter, but speed of value in operation does
+        self.visited_artists = set([row["url"] for row in self.database.select("SELECT url FROM artist")])
+        self.visited_albums = set([row["url"] for row in self.database.select("SELECT url FROM album")])
+        self.visited_users = set([row["url"] for row in self.database.select("SELECT url FROM user")])
 
-    def start_scrape(self, artist_url):
+    def start_scrape(self, artist_url=None):
         """ """
+        # if artist_url is None:
+        #     # Start from most recently visited artist page
+        #     artist_url = self.database.select("SELECT * FROM artist where id = (SELECT MAX(id) FROM artist)")
+
         self.artist_stack.append(artist_url)
         for url in self.artist_stack:
             artist_page = ArtistPage(url)
+            user = UserPage("https://bandcamp.com/jmblack?from=fanthanks", selenium_driver=self.driver)
+            user.write_to_database(self.database)
 
-            self.album_stack.extend(artist_page.albums)
-            for album_url in tqdm(self.album_stack, desc=f"Parsing album data for {url}"):
-                album_page = AlbumPage(album_url, selenium_driver=self.driver)
+            # self.album_stack.extend(artist_page.albums)
+            # for album_url in tqdm(self.album_stack, desc=f"Parsing album data for {url}"):
+            #     album_page = AlbumPage(album_url, selenium_driver=self.driver)
 
-                self.user_stack.extend(album_page.supporters)
+            #     self.user_stack.extend(album_page.supporters)
+            artist_page.write_to_database(self.database)
 
         print(len(self.user_stack))
 

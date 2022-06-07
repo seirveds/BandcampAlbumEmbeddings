@@ -1,13 +1,15 @@
 from math import ceil
-from bs4 import BeautifulSoup
+import re
 import requests
 
+from bs4 import BeautifulSoup
 from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
+from queries import ARTIST_ID_QUERY, INSERT_ALBUM_QUERY, INSERT_ARTIST_QUERY, INSERT_USER_QUERY
 from utils import ElementCountChanged
 
 
@@ -35,7 +37,16 @@ class AlbumPage(WebPage):
         super().__init__(url)
         self.selenium_driver = selenium_driver
         self.supporters = self.get_supporters()
-        # TODO meer album metadata tags, pub data, artist
+
+        # Placeholders for metadata
+        self.album_name = None
+        self.artist_url = None  # Not written to db, but needed to get artist_id
+        self.artist_name = None  # Not written to db, but needed to get artist_id
+        self.year = None
+        self.tags = None
+
+        # Fill placeholder variables
+        self.set_metadata()
 
     def get_supporters(self):
         # Load content shown by pressing button using selenium
@@ -63,7 +74,7 @@ class AlbumPage(WebPage):
         """ Keeps pressing the specified 'more...' button on the webpage until it doesn't show up anymore. """
         while True:
             try:
-                # We dont know how many times we need to click the button, so we just keep trying untill
+                # We dont know how many times we need to click the button, so we just keep trying until
                 # we cant find the button on the page anymore
                 a_tag = self.selenium_driver.driver.find_element(By.XPATH, xpath_selector)
 
@@ -75,13 +86,53 @@ class AlbumPage(WebPage):
             except (NoSuchElementException, ElementNotInteractableException, TimeoutException):
                 break
 
+    def set_metadata(self):
+        """ Use beautifulsoup to scrape metadata from html. """
+        self.album_name = self.soup.find("h2", class_="trackTitle").text.strip()
+
+        # Needed for getting artist id
+        self.artist_url = self.soup.find("div", id="name-section").find("a")["href"]
+        self.artist_name = self.soup.find("p", id="band-name-location").find("span", class_="title").text.strip()
+
+        # Year is written in plaintext in a div, we use regex to extract the year from the text
+        year_div = self.soup.find("div", class_="tralbumData tralbum-credits").text
+        self.year = re.search(r"released[\s\w\d]+,\s([\d]{4})", year_div).group(1)
+
+        tags_div = self.soup.find("div", class_="tralbumData tralbum-tags tralbum-tags-nu")
+        tags = sorted([a.text for a in tags_div.find_all("a", class_="tag")])
+        # Want a single column for tags, so we use a comma separated string
+        self.tags = ', '.join(tags)
+
+    def write_to_database(self, database):
+        """ Write self to database. If album artist does not appear in artist table we write the artist as well. This is done
+        because we need an artist id to link the album. """
+        # Use artist url to query the artist id from database
+        artist_id = database.execute(ARTIST_ID_QUERY.format(artist_url=self.artist_url))
+        if not artist_id:
+            database.execute(INSERT_ARTIST_QUERY.format(
+                artist_name=self.artist_name,
+                artist_url=self.artist_url
+            ))
+            artist_id = database.execute(ARTIST_ID_QUERY.format(artist_url=self.artist_url))
+
+        database.execute(INSERT_ALBUM_QUERY.format(
+            album_url=self.url,
+            album_name=self.album_name,
+            artist_id=artist_id,
+            year=self.year,
+            tags=self.tags
+        ))
 
 class UserPage(WebPage):
     def __init__(self, url, selenium_driver=None):
         super().__init__(url)
+        # Clean referral part in url
+        if self.url.endswith("?from=fanthanks"):
+            self.url = self.url.replace("?from=fanthanks", "")
+
         self.selenium_driver = selenium_driver
         self.collection = self.get_collection()
-
+        self.username = self.get_username()
 
     def get_collection(self):
         """ """
@@ -118,11 +169,22 @@ class UserPage(WebPage):
 
         return albums
 
+    def get_username(self):
+        return self.soup.find("div", class_="name").find("span").text.strip()
+
+    def write_to_database(self, database):
+        """ Stores self in database. """
+        database.execute(INSERT_USER_QUERY.format(
+            username=self.username,
+            user_url=self.url
+        ))
+
 
 class ArtistPage(WebPage):
     def __init__(self, url):
         super().__init__(url)
         self.albums = self.get_albums()
+        self.artist_name = self.get_artist_name()
 
     def get_albums(self):
         """ Returns list of AlbumPage objects, one for every project of an artist. Projects are
@@ -134,3 +196,21 @@ class ArtistPage(WebPage):
         album_urls = [self.url + li.find("a")["href"] for li in li_elements]
 
         return album_urls
+
+    def get_artist_name(self):
+        """ Retrieve artists name from specified tag. """
+        return self.soup.find("p", id="band-name-location").find("span", class_="title").text.strip()
+
+    def write_to_database(self, database):
+        """ Store self in database. """
+        database.execute(f"""
+            INSERT OR IGNORE INTO artist (name, url)
+            VALUES ('{self.artist_name}', '{self.url}')
+        """)
+
+
+if __name__ == "__main__":
+    from scraper import SeleniumDriver
+    driver = SeleniumDriver()
+    # album = AlbumPage("https://fffoxtails.bandcamp.com/album/fawn", selenium_driver=driver)
+    user = UserPage("https://bandcamp.com/jmblack", selenium_driver=driver)

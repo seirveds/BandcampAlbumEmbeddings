@@ -1,5 +1,8 @@
 import sqlite3
 
+from queries import CREATE_TABLE_ALBUM, CREATE_TABLE_ARTIST,\
+                    CREATE_TABLE_USER, CREATE_TABLE_USER_SUPPORTS
+
 
 class BandcampDB:
     def __init__(self, db_name, create_new_db=False):
@@ -14,42 +17,25 @@ class BandcampDB:
         """ Wrapper for executing query. """
         return self.cursor.execute(query)
 
+    def select(self, query):
+        """ Returns result of select query as JSON. """
+        result = self.execute(query)
+        column_names = [tup[0] for tup in result.description]
+        return [dict(zip(column_names, row)) for row in result.fetchall()]
+
     def create_tables(self):
         """ Creates album, artist, user, and user_supports tables. """
         # Initialize album table
-        self.execute("""
-            CREATE TABLE album (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name varchar(128) NOT NULL,
-                artist_id INTEGER NOT NULL,
-                year INTEGER NOT NULL,
-                tags varchar(255)
-            );
-        """)
+        self.execute(CREATE_TABLE_ALBUM)
 
         # Initialize artist table
-        self.execute("""
-            CREATE TABLE artist (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name varchar(128) NOT NULL
-            )
-        """)
+        self.execute(CREATE_TABLE_ARTIST)
 
         # Initialize user table
-        self.execute("""
-            CREATE TABLE user (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name varchar(128) NOT NULL
-            )
-        """)
+        self.execute(CREATE_TABLE_USER)
 
         # Initialize user_supports table
-        self.execute("""
-            CREATE TABLE user_supports (
-                user_id INTEGER NOT NULL,
-                album_id INTEGER NOT NULL
-            )
-        """)
+        self.execute(CREATE_TABLE_USER_SUPPORTS)
 
     def commit_and_close(self):
         """ Commits all updates to table and closes connection. """
@@ -73,30 +59,30 @@ if __name__ == "__main__":
 
     db = BandcampDB(f, create_new_db=True)
 
-    artist_count = 1000
-    album_count = 100000
-    user_count = 50000
+    artist_count = 100
+    album_count = 1000
+    user_count = 5000
 
     # Dummy artist data
     for _ in tqdm(range(artist_count), desc="Generating artist data"):
-        db.execute(f"INSERT INTO artist ('name') VALUES ('{random_string(10)}')")
+        db.execute(f"INSERT INTO artist ('name', 'url') VALUES ('{random_string(10)}', 'http://{random_string(5)}.bandcamp.com')")
 
     # Dummy album data
     for _ in tqdm(range(album_count), desc="Generating album data"):
         db.execute(f"""
             INSERT INTO album
-            ('name', 'artist_id', 'year', 'tags')
+            ('name', 'url', 'artist_id', 'year', 'tags')
             VALUES
-            ('{random_string(5)}', {random.choice([i for i in range(1, 1 + artist_count)])}, {random.choice([i for i in range(2015, 2023)])}, '{random_string(20)}')
+            ('{random_string(5)}', 'http://{random_string(5)}.bandcamp.com', {random.choice([i for i in range(1, 1 + artist_count)])}, {random.choice([i for i in range(2015, 2023)])}, '{random_string(20)}')
         """)
 
     # Dummy user data
     for user_id in tqdm(range(user_count), desc="Generating user data"):
         db.execute(f"""
             INSERT INTO user
-            ('name')
+            ('name', 'url')
             VALUES
-            ('{random_string(5)}_{random_string(7)}')
+            ('{random_string(5)}_{random_string(7)}', 'http://{random_string(5)}.bandcamp.com')
         """)
 
         # Randomly choose albums user supports
@@ -108,16 +94,12 @@ if __name__ == "__main__":
                 ({user_id}, {random.choice([i for i in range(1, album_count + 1)])})
             """)
 
-    # for row in db.execute("SELECT * FROM artist"):
-    #     print(row)
-    #
-    # for row in db.execute("SELECT * FROM album"):
-    #     print(row)
-    #
-    # for row in db.execute("SELECT * FROM user"):
-    #     print(row)
-    #
-    # for row in db.execute("SELECT * FROM user_supports"):
-    #     print(row)
+    print(db.select("SELECT * FROM artist where id = (SELECT MAX(id) FROM artist)"))
+    
+    # print(db.select("SELECT * FROM album")[:5])
+    
+    # print(db.select("SELECT * FROM user")[:5])
+    
+    # print(db.select("SELECT * FROM user_supports")[:5])
 
     db.commit_and_close()
