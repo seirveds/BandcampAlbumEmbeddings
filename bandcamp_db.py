@@ -1,7 +1,7 @@
 import sqlite3
 
-from queries import CREATE_TABLE_ALBUM, CREATE_TABLE_ARTIST,\
-                    CREATE_TABLE_USER, CREATE_TABLE_USER_SUPPORTS
+from queries import CREATE_TABLE_ALBUM, CREATE_TABLE_ALBUM_METADATA,\
+                    CREATE_TABLE_ARTIST, CREATE_TABLE_USER, CREATE_TABLE_USER_SUPPORTS
 
 
 class BandcampDB:
@@ -27,6 +27,9 @@ class BandcampDB:
         """ Creates album, artist, user, and user_supports tables. """
         # Initialize album table
         self.execute(CREATE_TABLE_ALBUM)
+
+        # Intialize album metadata table
+        self.execute(CREATE_TABLE_ALBUM_METADATA)
 
         # Initialize artist table
         self.execute(CREATE_TABLE_ARTIST)

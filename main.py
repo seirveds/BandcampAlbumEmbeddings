@@ -9,12 +9,15 @@ DB_NAME = "BandcampDB.db"
 
 if not os.path.exists(DB_NAME):
     # Dont need the object, just want to make database with correct tables
+    print(f"Making new database '{DB_NAME}'")
     _ = BandcampDB(db_name=DB_NAME, create_new_db=True)
 
 database = BandcampDB(db_name=DB_NAME)
 scraper = Scraper(database=database)
 
-scraper.start_scrape("https://fffoxtails.bandcamp.com/album/fawn")
+# Fails on https://bandcamp.com/Nicolegaffneyo?from=fanthanks
+# scraper.start_scrape("https://fffoxtails.bandcamp.com/")
+# TODO tables empty
 print(database.select("SELECT * FROM artist"))
 print(database.select("SELECT * FROM user"))
 print(database.select("SELECT * FROM album"))

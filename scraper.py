@@ -1,10 +1,9 @@
+import re
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
-from tqdm import tqdm
-
-from bandcamp_db import BandcampDB
+from queries import VISITED_URLS_QUERY
 from webpages import AlbumPage, ArtistPage, UserPage
 
 
@@ -22,39 +21,67 @@ class Scraper:
     def __init__(self, database):
         self.driver = SeleniumDriver()
         self.database = database
-        # Pages to visit
-        self.artist_stack = []
-        self.album_stack = []
-        self.user_stack = []
+
+        # Urls to visit
+        # TODO set if order doesnt matter?
+        self.stack = []
 
         # Load urls of visited pages from database so we can skip them if we see them again
         # Also use sets instead of lists as order doesnt matter, but speed of value in operation does
-        self.visited_artists = set([row["url"] for row in self.database.select("SELECT url FROM artist")])
-        self.visited_albums = set([row["url"] for row in self.database.select("SELECT url FROM album")])
-        self.visited_users = set([row["url"] for row in self.database.select("SELECT url FROM user")])
+        self.visited = set([row["url"] for row in self.database.select(VISITED_URLS_QUERY)])
 
-    def start_scrape(self, artist_url=None):
+
+    def start_scrape(self, url=None, limit=10):
         """ """
-        # if artist_url is None:
-        #     # Start from most recently visited artist page
-        #     artist_url = self.database.select("SELECT * FROM artist where id = (SELECT MAX(id) FROM artist)")
+        # TODO multiprocessing, speed up selenium
+        # TODO skip pages we've seen before
+        self.stack.append(url)
 
-        self.artist_stack.append(artist_url)
-        for url in self.artist_stack:
-            artist_page = ArtistPage(url)
-            user = UserPage("https://bandcamp.com/jmblack?from=fanthanks", selenium_driver=self.driver)
-            user.write_to_database(self.database)
+        i = 1
+        while self.stack or i <= limit:
+            url = self.stack.pop()
+            print(url)
 
-            # self.album_stack.extend(artist_page.albums)
-            # for album_url in tqdm(self.album_stack, desc=f"Parsing album data for {url}"):
-            #     album_page = AlbumPage(album_url, selenium_driver=self.driver)
+            pagetype = self.get_page_type(url)
+            page = pagetype(url, selenium_driver=self.driver)
 
-            #     self.user_stack.extend(album_page.supporters)
-            artist_page.write_to_database(self.database)
+            # Write page data to database, functionality differs for every page type,
+            # but function call is the same
+            page.write_to_database(self.database)
 
-        print(len(self.user_stack))
+            # Depending on page type decide what urls to add to stack
+            if isinstance(page, AlbumPage):
+                self.stack.extend(page.supporters)
+            elif isinstance(page, ArtistPage):
+                # Should only be reached if the url passed to this function is an album url
+                # Artist data is written to database through AlbumPage.write_to_database()
+                self.stack.extend(page.albums)
+            elif isinstance(page, UserPage):
+                self.stack.extend(page.collection)
+            else:
+                raise Exception("Page is not in types (AlbumPage, ArtistPage, UserPage)")
+
+            print(len(self.stack))
+
+        print(self.stack, len(self.stack))
 
     def quit(self):
         """ Shut down selenium driver and database connection. """
         self.driver.driver.quit()
         self.database.commit_and_close()
+
+    @staticmethod
+    def get_page_type(url):
+        """ Transforms an url to its corresponsing WebPage subclass. """
+        album_page_pattern = r"https://[\w\d-]+.bandcamp.com/[\w]+/[\w\d-]+$"
+        artist_page_pattern = r"https://[\w\d-]+.bandcamp.com[/]?$"
+        user_page_pattern = r"https://bandcamp.com/[\w\d-]+(\?from=fanthanks)?$"
+
+        if re.match(album_page_pattern, url):
+            return AlbumPage
+        elif re.match(artist_page_pattern, url):
+            return ArtistPage
+        elif re.match(user_page_pattern, url):
+            return UserPage
+        else:
+            raise Exception(f"Could not match url {url} to any regex pattern.")
