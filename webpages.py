@@ -143,6 +143,12 @@ class AlbumPage(WebPage):
             tags=self.tags
         ))
 
+        # for l in database.select("SELECT * FROM album"):
+        #     print(l)
+        # for l in database.select("SELECT * from album_metadata"):
+        #     print(l)
+
+
 
 class ArtistPage(WebPage):
     def __init__(self, url, selenium_driver=None):
@@ -186,9 +192,11 @@ class UserPage(WebPage):
 
     def get_collection(self):
         """ """
-        import time
-        # Use selenium to press button if it is found on page
-        if self.soup.find("button", class_="show-more") is not None:
+        # Try to find show whole collection button. We look at the div first because there exists another
+        # button with the class "show-more" if user collection < 20 items+
+        show_collection_button = self.soup.find("div", class_="collection-items").find("button", class_="show-more")
+        # If the button is found, we use selenium to click it and scroll down the webpage to load the whole collection
+        if show_collection_button is not None:
             # TODO check why below line is very slow
             self.selenium_driver.driver.get(self.url)
 
