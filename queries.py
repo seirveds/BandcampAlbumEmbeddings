@@ -52,7 +52,7 @@ VALUES ('{album_url}')
 
 INSERT_ALBUM_METADATA_QUERY = """
 INSERT OR IGNORE INTO album_metadata (id, artist_id, name, year, tags)
-VALUES ('{album_id}', {artist_id}, '{album_name}', {year}, '{tags}')
+VALUES ({album_id}, {artist_id}, '{album_name}', {year}, '{tags}')
 """
 
 INSERT_ARTIST_QUERY = """

@@ -1,3 +1,5 @@
+import traceback
+import re
 import sqlite3
 
 from queries import CREATE_TABLE_ALBUM, CREATE_TABLE_ALBUM_METADATA,\
@@ -15,7 +17,15 @@ class BandcampDB:
 
     def execute(self, query):
         """ Wrapper for executing query. """
-        return self.cursor.execute(query)
+        # Replace single apostrophes in strings with double apostrophes to prevent errors
+        pattern = r"('[\w\d ]+)'([\w\d ]+')"
+        # Use capturing groups to only replace the apostrophe
+        query = re.sub(pattern, r"\1''\2", query)
+        try:
+            return self.cursor.execute(query)
+        except (sqlite3.OperationalError, sqlite3.IntegrityError):
+            print(traceback.format_exc())
+            print(query)
 
     def select(self, query):
         """ Returns result of select query as JSON. """

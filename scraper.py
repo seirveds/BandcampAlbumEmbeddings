@@ -31,39 +31,43 @@ class Scraper:
         self.visited = set([row["url"] for row in self.database.select(VISITED_URLS_QUERY)])
 
 
-    def start_scrape(self, url=None, limit=10):
+    def start_scrape(self, url=None, limit=100):
         """ """
         # TODO multiprocessing, speed up selenium
         # TODO skip pages we've seen before
         self.stack.append(url)
 
         i = 1
-        while self.stack or i <= limit:
+        while self.stack and i <= limit:
             url = self.stack.pop()
-            print(url)
 
-            pagetype = self.get_page_type(url)
-            page = pagetype(url, selenium_driver=self.driver)
-
-            # Write page data to database, functionality differs for every page type,
-            # but function call is the same
-            page.write_to_database(self.database)
-
-            # Depending on page type decide what urls to add to stack
-            if isinstance(page, AlbumPage):
-                self.stack.extend(page.supporters)
-            elif isinstance(page, ArtistPage):
-                # Should only be reached if the url passed to this function is an album url
-                # Artist data is written to database through AlbumPage.write_to_database()
-                self.stack.extend(page.albums)
-            elif isinstance(page, UserPage):
-                self.stack.extend(page.collection)
+            # TODO benchmark if this is faster than stack.extend([u for u in list if u not in self.stack])
+            if url in self.visited:
+                pass
             else:
-                raise Exception("Page is not in types (AlbumPage, ArtistPage, UserPage)")
+                print(20 * "#", url, 20 * "#")
 
-            print(len(self.stack))
+                pagetype = self.get_page_type(url)
+                page = pagetype(url, selenium_driver=self.driver)
 
-        print(self.stack, len(self.stack))
+                # Write page data to database, functionality differs for every page type,
+                # but function call is the same
+                page.write_to_database(self.database)
+
+                # Depending on page type decide what urls to add to stack
+                if isinstance(page, AlbumPage):
+                    self.stack.extend(page.supporters)
+                elif isinstance(page, ArtistPage):
+                    # Should only be reached if the url passed to this function is an album url
+                    # Artist data is written to database through AlbumPage.write_to_database()
+                    self.stack.extend(page.albums)
+                elif isinstance(page, UserPage):
+                    self.stack.extend(page.collection)
+                else:
+                    raise Exception("Page is not in types (AlbumPage, ArtistPage, UserPage)")
+
+                i += 1
+                self.visited.add(url)
 
     def quit(self):
         """ Shut down selenium driver and database connection. """
@@ -73,8 +77,11 @@ class Scraper:
     @staticmethod
     def get_page_type(url):
         """ Transforms an url to its corresponsing WebPage subclass. """
-        album_page_pattern = r"https://[\w\d-]+.bandcamp.com/[\w]+/[\w\d-]+$"
-        artist_page_pattern = r"https://[\w\d-]+.bandcamp.com[/]?$"
+        # Format is not always artist.bandcamp.com, sometimes bandcamp is replaced
+        # by a another word, so we have to use very broad regex patterns
+        # TODO band.co.uk doesnt match regex
+        album_page_pattern = r"https://[\w\d-]+.[\w\d-]+.com/[\w]+/[\w\d-]+$"
+        artist_page_pattern = r"https://[\w\d-]+.[\w\d-]+.com[/]?$"
         user_page_pattern = r"https://bandcamp.com/[\w\d-]+(\?from=fanthanks)?$"
 
         if re.match(album_page_pattern, url):

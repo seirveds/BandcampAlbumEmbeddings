@@ -16,9 +16,9 @@ database = BandcampDB(db_name=DB_NAME)
 scraper = Scraper(database=database)
 
 # Fails on https://bandcamp.com/Nicolegaffneyo?from=fanthanks
-# scraper.start_scrape("https://fffoxtails.bandcamp.com/")
-# TODO tables empty
-print(database.select("SELECT * FROM artist"))
-print(database.select("SELECT * FROM user"))
-print(database.select("SELECT * FROM album"))
+scraper.start_scrape("https://bandcamp.com/Nicolegaffneyo?from=fanthanks")
+print(len(database.select("SELECT * FROM artist")))
+print(len(database.select("SELECT * FROM user")))
+print(len(database.select("SELECT * FROM album")))
+print(len(database.select("SELECT * FROM album_metadata")))
 scraper.quit()

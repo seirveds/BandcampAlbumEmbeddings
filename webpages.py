@@ -102,7 +102,8 @@ class AlbumPage(WebPage):
         year_div = self.soup.find("div", class_="tralbumData tralbum-credits").text
         self.year = re.search(r"released[\s\w\d]+,\s([\d]{4})", year_div).group(1)
 
-        tags_div = self.soup.find("div", class_="tralbumData tralbum-tags tralbum-tags-nu")
+        # Use regex classname because sometimes we have to add hidden to find tag
+        tags_div = self.soup.find("div", class_=re.compile(r"tralbumData tralbum-tags tralbum-tags-nu( hidden)?"))
         tags = sorted([a.text for a in tags_div.find_all("a", class_="tag")])
         # Want a single column for tags, so we use a comma separated string
         self.tags = ', '.join(tags)
@@ -218,7 +219,8 @@ class UserPage(WebPage):
                 WebDriverWait(self.selenium_driver.driver, 5).until(ElementCountChanged((By.XPATH, li_locator), li_count))
                 self.selenium_driver.driver.find_element(By.XPATH, '//body').send_keys(Keys.CONTROL+Keys.END)
 
-            assert(len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator)) == collection_size), "Not all albums able to be loaded"
+            # Bigger is no problem, that just means duplicates (which can happen sometimes)
+            assert(len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator)) >= collection_size), f"Not all albums able to be loaded"
 
             # Update html and soup attribute with html containing content loaded using selenium
             self.html = self.selenium_driver.driver.page_source.encode("utf-8")
