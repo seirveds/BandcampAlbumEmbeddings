@@ -34,7 +34,6 @@ class Scraper:
     def start_scrape(self, url=None, limit=100):
         """ """
         # TODO multiprocessing, speed up selenium
-        # TODO skip pages we've seen before
         self.stack.append(url)
 
         i = 1
@@ -77,11 +76,10 @@ class Scraper:
     @staticmethod
     def get_page_type(url):
         """ Transforms an url to its corresponsing WebPage subclass. """
-        # Format is not always artist.bandcamp.com, sometimes bandcamp is replaced
-        # by a another word, so we have to use very broad regex patterns
-        # TODO band.co.uk doesnt match regex
-        album_page_pattern = r"https://[\w\d-]+.[\w\d-]+.com/[\w]+/[\w\d-]+$"
-        artist_page_pattern = r"https://[\w\d-]+.[\w\d-]+.com[/]?$"
+        # Format is not always artist.bandcamp.com, so we have to match
+        # a very broad regex
+        album_page_pattern = r"https://[\w\d\-.]+/[\w]+/[\w\d-]+$"
+        artist_page_pattern = r"https://[\w\d\-.]+[/]?$"
         user_page_pattern = r"https://bandcamp.com/[\w\d-]+(\?from=fanthanks)?$"
 
         if re.match(album_page_pattern, url):

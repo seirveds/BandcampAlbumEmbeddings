@@ -116,7 +116,7 @@ class AlbumPage(WebPage):
         # If artist not in table we add it here so we have an artist id we can link to the album
         if not artist_id:
             database.execute(INSERT_ARTIST_QUERY.format(
-                artist_name=self.artist_name,
+                artist_name=self.artist_name.replace("'", "''"),
                 artist_url=self.artist_url
             ))
             # Retrieve artist id we've just written to database
@@ -138,17 +138,11 @@ class AlbumPage(WebPage):
         # Use above retrieved album id to write metadata to table
         database.execute(INSERT_ALBUM_METADATA_QUERY.format(
             album_id=album_id,
-            album_name=self.album_name,
+            album_name=self.album_name.replace("'", "''"),
             artist_id=artist_id,
             year=self.year,
             tags=self.tags
         ))
-
-        # for l in database.select("SELECT * FROM album"):
-        #     print(l)
-        # for l in database.select("SELECT * from album_metadata"):
-        #     print(l)
-
 
 
 class ArtistPage(WebPage):
@@ -174,10 +168,10 @@ class ArtistPage(WebPage):
 
     def write_to_database(self, database):
         """ Store self in database. """
-        database.execute(f"""
-            INSERT OR IGNORE INTO artist (name, url)
-            VALUES ('{self.artist_name}', '{self.url}')
-        """)
+        database.execute(INSERT_ARTIST_QUERY.format(
+            artist_name=self.artist_name.replace("'", "''"),
+            artist_url=self.url
+        ))
 
 
 class UserPage(WebPage):
@@ -216,7 +210,7 @@ class UserPage(WebPage):
                 # Count amount of albums loaded, we wait until this amount has changed before scrolling down to the bottom
                 li_count = len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator))
                 # TODO handle timeouts
-                WebDriverWait(self.selenium_driver.driver, 5).until(ElementCountChanged((By.XPATH, li_locator), li_count))
+                WebDriverWait(self.selenium_driver.driver, 10).until(ElementCountChanged((By.XPATH, li_locator), li_count))
                 self.selenium_driver.driver.find_element(By.XPATH, '//body').send_keys(Keys.CONTROL+Keys.END)
 
             # Bigger is no problem, that just means duplicates (which can happen sometimes)
@@ -241,7 +235,7 @@ class UserPage(WebPage):
         of scraping the album page. """
         # Write user data to database
         database.execute(INSERT_USER_QUERY.format(
-            username=self.username,
+            username=self.username.replace("'", "''"),
             user_url=self.url
         ))
 

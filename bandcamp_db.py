@@ -17,10 +17,6 @@ class BandcampDB:
 
     def execute(self, query):
         """ Wrapper for executing query. """
-        # Replace single apostrophes in strings with double apostrophes to prevent errors
-        pattern = r"('[\w\d ]+)'([\w\d ]+')"
-        # Use capturing groups to only replace the apostrophe
-        query = re.sub(pattern, r"\1''\2", query)
         try:
             return self.cursor.execute(query)
         except (sqlite3.OperationalError, sqlite3.IntegrityError):
