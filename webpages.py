@@ -100,7 +100,7 @@ class AlbumPage(WebPage):
 
         # Year is written in plaintext in a div, we use regex to extract the year from the text
         year_div = self.soup.find("div", class_="tralbumData tralbum-credits").text
-        self.year = re.search(r"released[\s\w\d]+,\s([\d]{4})", year_div).group(1)
+        self.year = re.search(r"release[sd][\s\w\d]+,\s([\d]{4})", year_div).group(1)
 
         # Use regex classname because sometimes we have to add hidden to find tag
         tags_div = self.soup.find("div", class_=re.compile(r"tralbumData tralbum-tags tralbum-tags-nu( hidden)?"))
@@ -141,8 +141,11 @@ class AlbumPage(WebPage):
             album_name=self.album_name.replace("'", "''"),
             artist_id=artist_id,
             year=self.year,
-            tags=self.tags
+            tags=self.tags.replace("'", "''")
         ))
+
+        # Make sure inserts are saved
+        database.conn.commit()
 
 
 class ArtistPage(WebPage):
@@ -172,6 +175,9 @@ class ArtistPage(WebPage):
             artist_name=self.artist_name.replace("'", "''"),
             artist_url=self.url
         ))
+
+        # Make sure inserts are saved
+        database.conn.commit()
 
 
 class UserPage(WebPage):
@@ -214,7 +220,7 @@ class UserPage(WebPage):
                 self.selenium_driver.driver.find_element(By.XPATH, '//body').send_keys(Keys.CONTROL+Keys.END)
 
             # Bigger is no problem, that just means duplicates (which can happen sometimes)
-            assert(len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator)) >= collection_size), f"Not all albums able to be loaded"
+            # assert(len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator)) >= collection_size), f"Not all albums able to be loaded"
 
             # Update html and soup attribute with html containing content loaded using selenium
             self.html = self.selenium_driver.driver.page_source.encode("utf-8")
@@ -262,6 +268,9 @@ class UserPage(WebPage):
                 user_id=user_id,
                 album_id=album_id
             ))
+
+        # Make sure inserts are saved
+        database.conn.commit()
 
 
 if __name__ == "__main__":

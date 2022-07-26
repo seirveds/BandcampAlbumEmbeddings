@@ -1,6 +1,7 @@
 import re
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 
 from queries import VISITED_URLS_QUERY
@@ -23,50 +24,54 @@ class Scraper:
         self.database = database
 
         # Urls to visit
-        # TODO set if order doesnt matter?
         self.stack = []
 
         # Load urls of visited pages from database so we can skip them if we see them again
         # Also use sets instead of lists as order doesnt matter, but speed of value in operation does
-        self.visited = set([row["url"] for row in self.database.select(VISITED_URLS_QUERY)])
+        visited_urls = [row["url"] for row in self.database.select(VISITED_URLS_QUERY)]
+        self.visited = set(visited_urls)
+        self.last_visited = visited_urls[-1] if visited_urls else None
 
 
-    def start_scrape(self, url=None, limit=100):
+    def start_scrape(self, url=None):
         """ """
-        # TODO multiprocessing, speed up selenium
+        if url is None:
+            # TODO doesnt work, save stack on exit and take first from there
+            url = self.last_visited
+
         self.stack.append(url)
 
-        i = 1
-        while self.stack and i <= limit:
-            url = self.stack.pop()
+        while self.stack:
+            url = self.stack.pop(0)
+            print(f"Scraping {url}")
 
-            # TODO benchmark if this is faster than stack.extend([u for u in list if u not in self.stack])
-            if url in self.visited:
-                pass
-            else:
-                print(20 * "#", url, 20 * "#")
-
+            if url not in self.visited:
                 pagetype = self.get_page_type(url)
-                page = pagetype(url, selenium_driver=self.driver)
+                try:
+                    page = pagetype(url, selenium_driver=self.driver)
 
-                # Write page data to database, functionality differs for every page type,
-                # but function call is the same
-                page.write_to_database(self.database)
+                    # Write page data to database, functionality differs for every page type,
+                    # but function call is the same
+                    page.write_to_database(self.database)
 
-                # Depending on page type decide what urls to add to stack
-                if isinstance(page, AlbumPage):
-                    self.stack.extend(page.supporters)
-                elif isinstance(page, ArtistPage):
-                    # Should only be reached if the url passed to this function is an album url
-                    # Artist data is written to database through AlbumPage.write_to_database()
-                    self.stack.extend(page.albums)
-                elif isinstance(page, UserPage):
-                    self.stack.extend(page.collection)
-                else:
-                    raise Exception("Page is not in types (AlbumPage, ArtistPage, UserPage)")
+                    # Depending on page type decide what urls to add to stack
+                    if isinstance(page, AlbumPage):
+                        self.stack.extend(page.supporters)
+                    elif isinstance(page, ArtistPage):
+                        # Should only be reached if the url passed to this function is an album url
+                        # Artist data is written to database through AlbumPage.write_to_database()
+                        self.stack.extend(page.albums)
+                    elif isinstance(page, UserPage):
+                        self.stack.extend(page.collection)
+                    else:
+                        raise Exception("Page is not in types (AlbumPage, ArtistPage, UserPage)")
 
-                i += 1
-                self.visited.add(url)
+                    self.visited.add(url)
+                except TimeoutException:
+                    print(f"TimeoutException for {url}")
+                    self.stack.append(url)
+            else:
+                print(f"Already visited {url}, skipping")
 
     def quit(self):
         """ Shut down selenium driver and database connection. """

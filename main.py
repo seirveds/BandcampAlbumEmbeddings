@@ -15,10 +15,10 @@ if not os.path.exists(DB_NAME):
 database = BandcampDB(db_name=DB_NAME)
 scraper = Scraper(database=database)
 
-# Fails on https://bandcamp.com/Nicolegaffneyo?from=fanthanks
-scraper.start_scrape("https://bandcamp.com/Nicolegaffneyo?from=fanthanks")
-print(len(database.select("SELECT * FROM artist")))
-print(len(database.select("SELECT * FROM user")))
-print(len(database.select("SELECT * FROM album")))
-print(len(database.select("SELECT * FROM album_metadata")))
+scraper.start_scrape("https://bandcamp.com/cardiganrecords")
+
+print(f"Total artists: {len(database.select('SELECT * FROM artist')):,}")
+print(f"Total users: {len(database.select('SELECT * FROM user')):,}")
+print(f"Total albums: {len(database.select('SELECT * FROM album')):,}")
+print(f"Total user-artist links: {len(database.select('SELECT * FROM user_supports')):,}")
 scraper.quit()

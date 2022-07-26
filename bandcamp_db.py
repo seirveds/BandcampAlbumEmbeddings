@@ -1,5 +1,4 @@
 import traceback
-import re
 import sqlite3
 
 from queries import CREATE_TABLE_ALBUM, CREATE_TABLE_ALBUM_METADATA,\
