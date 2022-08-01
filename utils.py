@@ -17,3 +17,7 @@ class ElementCountChanged(object):
             return element
         else:
             return False
+
+
+class CollectionTooLargeException(Exception):
+    pass

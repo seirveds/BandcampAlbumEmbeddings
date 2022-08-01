@@ -29,6 +29,14 @@ CREATE TABLE artist (
 );
 """
 
+CREATE_TABLE_LOGS = """
+CREATE TABLE logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url varchar(128) NOT NULL UNIQUE,
+    scraped BOOLEAN NOT NULL DEFAULT 0
+);
+"""
+
 CREATE_TABLE_USER = """
 CREATE TABLE user (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,6 +68,11 @@ INSERT OR IGNORE INTO artist (name, url)
 VALUES ('{artist_name}', '{artist_url}')
 """
 
+INSERT_LOGS_QUERY = """
+INSERT OR IGNORE INTO logs (url)
+VALUES {urls}
+"""
+
 INSERT_USER_QUERY = """
 INSERT OR IGNORE INTO user (name, url)
 VALUES ('{username}', '{user_url}')
@@ -70,10 +83,19 @@ INSERT OR IGNORE INTO user_supports (user_id, album_id)
 VALUES ({user_id}, {album_id})
 """
 
+UPDATE_LOGS_TABLE = """
+UPDATE logs
+SET scraped = 1
+WHERE url = '{url}'
+"""
+
 VISITED_URLS_QUERY = """
-SELECT url FROM artist
-UNION
-SELECT url FROM album
-UNION
-SELECT url FROM user
+SELECT url FROM logs
+WHERE scraped = 1
+"""
+
+TO_VISIT_URLS_QUERY = """
+SELECT url FROM logs
+WHERE scraped = 0
+ORDER BY id ASC
 """

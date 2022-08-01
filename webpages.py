@@ -13,7 +13,7 @@ from tqdm import tqdm
 from queries import ALBUM_ID_QUERY, ARTIST_ID_QUERY, USER_ID_QUERY,\
                     INSERT_ALBUM_METADATA_QUERY, INSERT_ALBUM_QUERY, INSERT_ARTIST_QUERY,\
                     INSERT_USER_QUERY, INSERT_USER_SUPPORTS_QUERY
-from utils import ElementCountChanged
+from utils import CollectionTooLargeException, ElementCountChanged
 
 
 class WebPage:
@@ -65,7 +65,8 @@ class AlbumPage(WebPage):
 
             # Update html and soup attribute with html containing content loaded using selenium
             self.html = self.selenium_driver.driver.page_source.encode("utf-8")
-            self.soup = BeautifulSoup(self.html, "lxml")
+            # Decode html to prevent BeautifulSoup from incorrectly parsing html
+            self.soup = BeautifulSoup(self.html.decode("utf8"), "lxml")
 
         supporter_div = self.soup.find("div", class_="deets populated")
         if supporter_div is not None:
@@ -100,7 +101,10 @@ class AlbumPage(WebPage):
 
         # Year is written in plaintext in a div, we use regex to extract the year from the text
         year_div = self.soup.find("div", class_="tralbumData tralbum-credits").text
-        self.year = re.search(r"release[sd][\s\w\d]+,\s([\d]{4})", year_div).group(1)
+        try:
+            self.year = re.search(r"release[sd][\s\w\d]+,\s([\d]{4})", year_div).group(1)
+        except AttributeError:
+            self.year = 9999  # Column is NOT NULL so if no year could be found we put 9999 as placeholder
 
         # Use regex classname because sometimes we have to add hidden to find tag
         tags_div = self.soup.find("div", class_=re.compile(r"tralbumData tralbum-tags tralbum-tags-nu( hidden)?"))
@@ -145,7 +149,7 @@ class AlbumPage(WebPage):
         ))
 
         # Make sure inserts are saved
-        database.conn.commit()
+        database.commit()
 
 
 class ArtistPage(WebPage):
@@ -177,7 +181,7 @@ class ArtistPage(WebPage):
         ))
 
         # Make sure inserts are saved
-        database.conn.commit()
+        database.commit()
 
 
 class UserPage(WebPage):
@@ -212,22 +216,31 @@ class UserPage(WebPage):
             # Each scroll loads 20 new albums, use the total collection size to calculate how often we need to scroll
             # to the bottom of the page to load new content
             collection_size = int(self.selenium_driver.driver.find_element(By.XPATH, "//span[@class='count']").text)
-            for _ in tqdm(range(ceil((collection_size - 20) / 20)), desc=f"Loading collection for user {self.url}"):
-                # Count amount of albums loaded, we wait until this amount has changed before scrolling down to the bottom
-                li_count = len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator))
-                # TODO handle timeouts
-                WebDriverWait(self.selenium_driver.driver, 10).until(ElementCountChanged((By.XPATH, li_locator), li_count))
-                self.selenium_driver.driver.find_element(By.XPATH, '//body').send_keys(Keys.CONTROL+Keys.END)
+            # We get a timeout exception for collections ~ > 100 (2000 albums), so we skip the user if the collection is too large
+            # TODO fix above
+            if collection_size < 2000:
+                for _ in tqdm(range(ceil((collection_size - 20) / 20)), desc=f"Loading collection for user {self.url}"):
+                    # Count amount of albums loaded, we wait until this amount has changed before scrolling down to the bottom
+                    li_count = len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator))
+                    # TODO handle timeouts
+                    WebDriverWait(self.selenium_driver.driver, 10).until(ElementCountChanged((By.XPATH, li_locator), li_count))
+                    self.selenium_driver.driver.find_element(By.XPATH, '//body').send_keys(Keys.CONTROL+Keys.END)
+            else:
+                raise CollectionTooLargeException
 
             # Bigger is no problem, that just means duplicates (which can happen sometimes)
             # assert(len(self.selenium_driver.driver.find_elements(By.XPATH, li_locator)) >= collection_size), f"Not all albums able to be loaded"
 
             # Update html and soup attribute with html containing content loaded using selenium
             self.html = self.selenium_driver.driver.page_source.encode("utf-8")
-            self.soup = BeautifulSoup(self.html, "lxml")
+            # Decode self.html to prevent beautifulsoup from incorrectly parsing pages
+            # containing emojis
+            self.soup = BeautifulSoup(self.html.decode("utf-8"), "lxml")
 
         # Find ol tag containg all albums and retrieve album urls from a tag hrefs
         album_ol = self.soup.find("ol", class_="collection-grid")
+        # if album_ol is None:
+        #     raise NoHtmlBodyException
         albums = [a["href"] for a in album_ol.find_all("a", class_="item-link", target="_blank")]
 
         return albums
@@ -270,7 +283,7 @@ class UserPage(WebPage):
             ))
 
         # Make sure inserts are saved
-        database.conn.commit()
+        database.commit()
 
 
 if __name__ == "__main__":

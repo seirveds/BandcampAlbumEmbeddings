@@ -2,7 +2,8 @@ import traceback
 import sqlite3
 
 from queries import CREATE_TABLE_ALBUM, CREATE_TABLE_ALBUM_METADATA,\
-                    CREATE_TABLE_ARTIST, CREATE_TABLE_USER, CREATE_TABLE_USER_SUPPORTS
+                    CREATE_TABLE_ARTIST, CREATE_TABLE_LOGS, CREATE_TABLE_USER,\
+                    CREATE_TABLE_USER_SUPPORTS
 
 
 class BandcampDB:
@@ -39,11 +40,18 @@ class BandcampDB:
         # Initialize artist table
         self.execute(CREATE_TABLE_ARTIST)
 
+        # Initialize logs table
+        self.execute(CREATE_TABLE_LOGS)
+
         # Initialize user table
         self.execute(CREATE_TABLE_USER)
 
         # Initialize user_supports table
         self.execute(CREATE_TABLE_USER_SUPPORTS)
+
+    def commit(self):
+        """ Wrapper around conn.commit. """
+        self.conn.commit()
 
     def commit_and_close(self):
         """ Commits all updates to table and closes connection. """
