@@ -91,7 +91,7 @@ class Scraper:
                     print(f"TimeoutException for {url}")
                     self.stack.append(url)
                 except CollectionTooLargeException:
-                    print(f"Skipped {url}; collection to large")
+                    print(f"Skipped {url}; collection too large")
             else:
                 print(f"Already visited {url}, skipping")
 

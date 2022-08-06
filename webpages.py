@@ -77,6 +77,7 @@ class AlbumPage(WebPage):
 
     def press_more_buttons(self, xpath_selector):
         """ Keeps pressing the specified 'more...' button on the webpage until it doesn't show up anymore. """
+        counter = 1
         while True:
             try:
                 # We dont know how many times we need to click the button, so we just keep trying until
@@ -88,6 +89,10 @@ class AlbumPage(WebPage):
                 # Wait until element is clickable again, with max wait time of 5 seconds. If element could not clicked in
                 # 5 seconds WebDriverWait raises a TimeoutException, and the while loop will be broken.
                 WebDriverWait(self.selenium_driver.driver, 5).until(EC.element_to_be_clickable((By.XPATH, xpath_selector)))
+
+                # Print amount of times clicked, easy to see if program still running
+                print(f"{counter}/?", end='\r')
+                counter += 1
             except (NoSuchElementException, ElementNotInteractableException, TimeoutException):
                 break
 
@@ -239,8 +244,6 @@ class UserPage(WebPage):
 
         # Find ol tag containg all albums and retrieve album urls from a tag hrefs
         album_ol = self.soup.find("ol", class_="collection-grid")
-        # if album_ol is None:
-        #     raise NoHtmlBodyException
         albums = [a["href"] for a in album_ol.find_all("a", class_="item-link", target="_blank")]
 
         return albums
